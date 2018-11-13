@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -48,7 +47,6 @@ type StepDownload struct {
 }
 
 func (s *StepDownload) Run(_ context.Context, state multistep.StateBag) multistep.StepAction {
-	cache := state.Get("cache").(packer.Cache)
 	ui := state.Get("ui").(packer.Ui)
 
 	var checksum []byte
@@ -71,19 +69,8 @@ func (s *StepDownload) Run(_ context.Context, state multistep.StateBag) multiste
 	for i, url := range s.Url {
 		targetPath := s.TargetPath
 		if targetPath == "" {
-			// Determine a cache key. This is normally just the URL but
-			// if we force a certain extension we hash the URL and add
-			// the extension to force it.
-			cacheKey := url
-			if s.Extension != "" {
-				hash := sha1.Sum([]byte(url))
-				cacheKey = fmt.Sprintf(
-					"%s.%s", hex.EncodeToString(hash[:]), s.Extension)
-			}
-
 			log.Printf("Acquiring lock to download: %s", url)
-			targetPath = cache.Lock(cacheKey)
-			defer cache.Unlock(cacheKey)
+			panic("actually lock me !")
 		}
 
 		config := &DownloadConfig{

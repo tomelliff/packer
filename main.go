@@ -176,7 +176,7 @@ func wrappedMain() int {
 	}
 
 	log.Printf("Setting cache directory: %s", cacheDir)
-	cache := &packer.FileCache{CacheDir: cacheDir}
+	panic("set cache dir: " + cacheDir)
 
 	// Determine if we're in machine-readable mode by mucking around with
 	// the arguments...
@@ -214,8 +214,7 @@ func wrappedMain() int {
 			},
 			Version: version.Version,
 		},
-		Cache: cache,
-		Ui:    ui,
+		Ui: ui,
 	}
 
 	cli := &cli.CLI{

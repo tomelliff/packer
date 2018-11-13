@@ -517,13 +517,11 @@ func TestUserVariablesInBootCommand(t *testing.T) {
 	}
 
 	ui := packer.TestUi(t)
-	cache := &packer.FileCache{CacheDir: os.TempDir()}
 	hook := &packer.MockHook{}
 	driver := &hypervcommon.DriverMock{}
 
 	// Set up the state.
 	state := new(multistep.BasicStateBag)
-	state.Put("cache", cache)
 	state.Put("config", &b.config)
 	state.Put("driver", driver)
 	state.Put("hook", hook)

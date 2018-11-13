@@ -5,14 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/hashicorp/packer/template/interpolate"
+
+	getter "github.com/hashicorp/go-getter"
 )
 
 // ISOConfig contains configuration for downloading ISO images.
@@ -27,98 +27,51 @@ type ISOConfig struct {
 }
 
 func (c *ISOConfig) Prepare(ctx *interpolate.Context) (warnings []string, errs []error) {
-	if c.RawSingleISOUrl == "" && len(c.ISOUrls) == 0 {
+
+	if c.RawSingleISOUrl != "" {
+		c.ISOUrls = append([]string{c.RawSingleISOUrl}, c.ISOUrls...)
+	}
+	if len(c.ISOUrls) == 0 {
 		errs = append(
 			errs, errors.New("One of iso_url or iso_urls must be specified."))
 		return
-	} else if c.RawSingleISOUrl != "" && len(c.ISOUrls) > 0 {
-		errs = append(
-			errs, errors.New("Only one of iso_url or iso_urls may be specified."))
-		return
-	} else if c.RawSingleISOUrl != "" {
-		c.ISOUrls = []string{c.RawSingleISOUrl}
 	}
 
 	if c.ISOChecksumType == "" {
 		errs = append(
 			errs, errors.New("The iso_checksum_type must be specified."))
-	} else {
-		c.ISOChecksumType = strings.ToLower(c.ISOChecksumType)
-		if c.ISOChecksumType != "none" {
-			if c.ISOChecksum == "" && c.ISOChecksumURL == "" {
-				errs = append(
-					errs, errors.New("Due to large file sizes, an iso_checksum is required"))
+		return
+	}
+	c.ISOChecksumType = strings.ToLower(c.ISOChecksumType)
+	if c.ISOChecksumType != "none" {
+		if c.ISOChecksum == "" && c.ISOChecksumURL == "" {
+			errs = append(
+				errs, errors.New("Due to large file sizes, an iso_checksum is required"))
+			return warnings, errs
+		}
+
+		// If iso_checksum has no value use iso_checksum_url instead.
+		if c.ISOChecksumURL != "" {
+			dst := "/tmp/packer/chksm.iso" // TODO(azr): use code from #6950
+			err := getter.Get(dst, c.ISOChecksumURL)
+			if err != nil {
+				return warnings, append(errs, fmt.Errorf("Failed to download iso checksum file: %s", err))
+			}
+			file, err := os.Open(dst)
+			if err != nil {
+				errs = append(errs, err)
 				return warnings, errs
-			} else {
-				if h := HashForType(c.ISOChecksumType); h == nil {
-					errs = append(
-						errs, fmt.Errorf("Unsupported checksum type: %s", c.ISOChecksumType))
-					return warnings, errs
-				}
-
-				// If iso_checksum has no value use iso_checksum_url instead.
-				if c.ISOChecksum == "" {
-					u, err := url.Parse(c.ISOChecksumURL)
-					if err != nil {
-						errs = append(errs,
-							fmt.Errorf("Error parsing checksum: %s", err))
-						return warnings, errs
-					}
-					switch u.Scheme {
-					case "http", "https":
-						res, err := http.Get(c.ISOChecksumURL)
-						c.ISOChecksum = ""
-						if err != nil {
-							errs = append(errs,
-								fmt.Errorf("Error getting checksum from url: %s", c.ISOChecksumURL))
-							return warnings, errs
-						}
-						defer res.Body.Close()
-						err = c.parseCheckSumFile(bufio.NewReader(res.Body))
-						if err != nil {
-							errs = append(errs, err)
-							return warnings, errs
-						}
-					case "file":
-						path := u.Path
-
-						if runtime.GOOS == "windows" && len(path) > 2 && path[0] == '/' && path[2] == ':' {
-							path = strings.TrimLeft(path, "/")
-						}
-
-						file, err := os.Open(path)
-						if err != nil {
-							errs = append(errs, err)
-							return warnings, errs
-						}
-						err = c.parseCheckSumFile(bufio.NewReader(file))
-						if err != nil {
-							errs = append(errs, err)
-							return warnings, errs
-						}
-					case "":
-						break
-					default:
-						errs = append(errs,
-							fmt.Errorf("Error parsing checksum url: %s, scheme not supported: %s", c.ISOChecksumURL, u.Scheme))
-						return warnings, errs
-					}
-				}
+			}
+			defer file.Close()
+			err = c.parseCheckSumFile(bufio.NewReader(file))
+			if err != nil {
+				errs = append(errs, err)
+				return warnings, errs
 			}
 		}
 	}
 
 	c.ISOChecksum = strings.ToLower(c.ISOChecksum)
-
-	for i, url := range c.ISOUrls {
-		url, err := ValidatedURL(url)
-		if err != nil {
-			errs = append(
-				errs, fmt.Errorf("Failed to parse iso_url %d: %s", i+1, err))
-		} else {
-			c.ISOUrls[i] = url
-		}
-	}
 
 	if c.TargetExtension == "" {
 		c.TargetExtension = "iso"

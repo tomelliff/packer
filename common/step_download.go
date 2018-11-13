@@ -2,13 +2,13 @@ package common
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"log"
-	"time"
+
+	"github.com/hashicorp/go-getter"
+	urlhelper "github.com/hashicorp/go-getter/helper/url"
 
 	"github.com/hashicorp/packer/helper/multistep"
-	"github.com/hashicorp/packer/helper/useragent"
 	"github.com/hashicorp/packer/packer"
 )
 
@@ -49,114 +49,40 @@ type StepDownload struct {
 func (s *StepDownload) Run(_ context.Context, state multistep.StateBag) multistep.StepAction {
 	ui := state.Get("ui").(packer.Ui)
 
-	var checksum []byte
-	if s.Checksum != "" {
-		var err error
-		checksum, err = hex.DecodeString(s.Checksum)
-		if err != nil {
-			state.Put("error", fmt.Errorf("Error parsing checksum: %s", err))
-			return multistep.ActionHalt
-		}
-	}
-
 	ui.Say(fmt.Sprintf("Retrieving %s", s.Description))
-
-	// First try to use any already downloaded file
-	// If it fails, proceed to regular download logic
-
-	var downloadConfigs = make([]*DownloadConfig, len(s.Url))
-	var finalPath string
-	for i, url := range s.Url {
-		targetPath := s.TargetPath
-		if targetPath == "" {
-			log.Printf("Acquiring lock to download: %s", url)
-			panic("actually lock me !")
-		}
-
-		config := &DownloadConfig{
-			Url:        url,
-			TargetPath: targetPath,
-			CopyFile:   false,
-			Hash:       HashForType(s.ChecksumType),
-			Checksum:   checksum,
-			UserAgent:  useragent.String(),
-		}
-		downloadConfigs[i] = config
-
-		if match, _ := NewDownloadClient(config, ui).VerifyChecksum(config.TargetPath); match {
-			ui.Message(fmt.Sprintf("Found already downloaded, initial checksum matched, no download needed: %s", url))
-			finalPath = config.TargetPath
-			break
-		}
-	}
-
-	if finalPath == "" {
-		for i := range s.Url {
-			config := downloadConfigs[i]
-
-			path, err, retry := s.download(config, state)
-			if err != nil {
-				ui.Message(fmt.Sprintf("Error downloading: %s", err))
-			}
-
-			if !retry {
-				return multistep.ActionHalt
-			}
-
-			if err == nil {
-				finalPath = path
-				break
-			}
-		}
-	}
-
-	if finalPath == "" {
-		err := fmt.Errorf("%s download failed.", s.Description)
-		state.Put("error", err)
-		ui.Error(err.Error())
+	targetPath := s.TargetPath
+	if targetPath != "" {
+		state.Put("error", fmt.Errorf("a target path must be set"))
 		return multistep.ActionHalt
 	}
 
-	state.Put(s.ResultKey, finalPath)
-	return multistep.ActionContinue
+	log.Printf("Acquiring lock to: %s", targetPath)
+	panic("actually lock file !")
+
+	var errs []error
+	for _, url := range s.Url {
+		ui.Say(fmt.Sprintf("Trying %s", url))
+		u, err := urlhelper.Parse(url)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("url parse: %s", err))
+			continue // may be another url will work
+		}
+		// add checksum to url query params as go getter will checksum for us
+		u.Query().Set("checksum", s.ChecksumType+":"+s.Checksum)
+
+		if err := getter.GetFile(targetPath, u.String()); err != nil {
+			errs = append(errs, err)
+			continue // may be another url will work
+		}
+
+		ui.Say(fmt.Sprintf("%s downloaded", url))
+		state.Put(s.ResultKey, targetPath)
+		return multistep.ActionContinue
+	}
+
+	state.Put("error", fmt.Errorf("Downloading file: %v", errs))
+	return multistep.ActionHalt
+
 }
 
 func (s *StepDownload) Cleanup(multistep.StateBag) {}
-
-func (s *StepDownload) download(config *DownloadConfig, state multistep.StateBag) (string, error, bool) {
-	var path string
-	ui := state.Get("ui").(packer.Ui)
-
-	// Create download client with config
-	download := NewDownloadClient(config, ui)
-
-	downloadCompleteCh := make(chan error, 1)
-	go func() {
-		var err error
-		path, err = download.Get()
-		downloadCompleteCh <- err
-	}()
-
-	for {
-		select {
-		case err := <-downloadCompleteCh:
-
-			if err != nil {
-				return "", err, true
-			}
-			if download.config.CopyFile {
-				ui.Message(fmt.Sprintf("Transferred: %s", config.Url))
-			} else {
-				ui.Message(fmt.Sprintf("Using file in-place: %s", config.Url))
-			}
-
-			return path, nil, true
-
-		case <-time.After(1 * time.Second):
-			if _, ok := state.GetOk(multistep.StateCancelled); ok {
-				ui.Say("Interrupt received. Cancelling download...")
-				return "", nil, false
-			}
-		}
-	}
-}

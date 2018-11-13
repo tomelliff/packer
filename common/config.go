@@ -5,12 +5,9 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"time"
-
-	"github.com/hashicorp/packer/packer"
 )
 
 // PackerKeyEnv is used to specify the key interval (delay) between keystrokes
@@ -31,28 +28,6 @@ func ChooseString(vals ...string) string {
 	}
 
 	return ""
-}
-
-// SupportedProtocol verifies that the url passed is actually supported or not
-// This will also validate that the protocol is one that's actually implemented.
-func SupportedProtocol(u *url.URL) bool {
-	// url.Parse shouldn't return nil except on error....but it can.
-	if u == nil {
-		return false
-	}
-
-	// build a dummy NewDownloadClient since this is the only place that valid
-	// protocols are actually exposed.
-	cli := NewDownloadClient(&DownloadConfig{}, new(packer.NoopUi))
-
-	// Iterate through each downloader to see if a protocol was found.
-	ok := false
-	for scheme := range cli.config.DownloaderMap {
-		if strings.ToLower(u.Scheme) == strings.ToLower(scheme) {
-			ok = true
-		}
-	}
-	return ok
 }
 
 // DownloadableURL processes a URL that may also be a file path and returns
@@ -123,86 +98,4 @@ func DownloadableURL(original string) (string, error) {
 	// Anything left should be a non-existent relative path. So fix it up here.
 	result = filepath.ToSlash(filepath.Clean(result))
 	return fmt.Sprintf("file://./%s", result), nil
-}
-
-// Force the parameter into a url. This will transform the parameter into
-// a proper url, removing slashes, adding the proper prefix, etc.
-func ValidatedURL(original string) (string, error) {
-
-	// See if the user failed to give a url
-	if ok, _ := regexp.MatchString("(?m)^[^[:punct:]]+://", original); !ok {
-
-		// So since no magic was found, this must be a path.
-		result, err := DownloadableURL(original)
-		if err == nil {
-			return ValidatedURL(result)
-		}
-
-		return "", err
-	}
-
-	// Verify that the url is parseable...just in case.
-	u, err := url.Parse(original)
-	if err != nil {
-		return "", err
-	}
-
-	// We should now have a url, so verify that it's a protocol we support.
-	if !SupportedProtocol(u) {
-		return "", fmt.Errorf("Unsupported protocol scheme! (%#v)", u)
-	}
-
-	// We should now have a properly formatted and supported url
-	return u.String(), nil
-}
-
-// FileExistsLocally takes the URL output from DownloadableURL, and determines
-// whether it is present on the file system.
-// example usage:
-//
-// myFile, err = common.DownloadableURL(c.SourcePath)
-// ...
-// fileExists := common.StatURL(myFile)
-// possible output:
-// true -- should occur if the file is present, or if the file is not present,
-// but is not supposed to be (e.g. the schema is http://, not file://)
-// false -- should occur if there was an error stating the file, so the
-// file is not present when it should be.
-
-func FileExistsLocally(original string) bool {
-	// original should be something like file://C:/my/path.iso
-	u, _ := url.Parse(original)
-
-	// First create a dummy downloader so we can figure out which
-	// protocol to use.
-	cli := NewDownloadClient(&DownloadConfig{}, new(packer.NoopUi))
-	d, ok := cli.config.DownloaderMap[u.Scheme]
-	if !ok {
-		return false
-	}
-
-	// Check to see that it's got a Local way of doing things.
-	local, ok := d.(LocalDownloader)
-	if !ok {
-		return true // XXX: Remote URLs short-circuit this logic.
-	}
-
-	// Figure out where we're at.
-	wd, err := os.Getwd()
-	if err != nil {
-		return false
-	}
-
-	// Now figure out the real path to the file.
-	realpath, err := local.toPath(wd, *u)
-	if err != nil {
-		return false
-	}
-
-	// Finally we can seek the truth via os.Stat.
-	_, err = os.Stat(realpath)
-	if err != nil {
-		return false
-	}
-	return true
 }

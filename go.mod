@@ -14,6 +14,7 @@ require (
 	github.com/armon/go-metrics v0.0.0-20180713145231-3c58d8115a78
 	github.com/armon/go-radix v0.0.0-20160115234725-4239b77079c7
 	github.com/aws/aws-sdk-go v1.15.54
+	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
 	github.com/bgentry/speakeasy v0.0.0-20150902231413-36e9cfdd6909
 	github.com/biogo/hts v0.0.0-20160420073057-50da7d4131a3
 	github.com/cheggaaa/pb v1.0.26
@@ -27,6 +28,7 @@ require (
 	github.com/dylanmei/iso8601 v0.1.0
 	github.com/dylanmei/winrmtest v0.0.0-20170819153634-c2fbb09e6c08
 	github.com/go-ini/ini v1.25.4
+	github.com/gofrs/flock v0.7.0 // indirect
 	github.com/golang/protobuf v0.0.0-20160203230820-b982704f8bb7
 	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db
 	github.com/google/go-cmp v0.0.0-20180328201512-5411ab924f9f
@@ -41,11 +43,13 @@ require (
 	github.com/hashicorp/errwrap v0.0.0-20141028054710-7554cd9344ce
 	github.com/hashicorp/go-checkpoint v0.0.0-20171009173528-1545e56e46de
 	github.com/hashicorp/go-cleanhttp v0.0.0-20160217214820-875fb671b3dd
+	github.com/hashicorp/go-getter v0.0.0-20181108020118-b6e1d7a3a787 // indirect
 	github.com/hashicorp/go-immutable-radix v0.0.0-20180129170900-7f3cd4390caa
 	github.com/hashicorp/go-multierror v0.0.0-20150916205742-d30f09973e19
 	github.com/hashicorp/go-oracle-terraform v0.0.0-20181016190316-007121241b79
 	github.com/hashicorp/go-retryablehttp v0.0.0-20180718195005-e651d75abec6
 	github.com/hashicorp/go-rootcerts v0.0.0-20160503143440-6bb64b370b90
+	github.com/hashicorp/go-safetemp v1.0.0 // indirect
 	github.com/hashicorp/go-sockaddr v0.0.0-20180320115054-6d291a969b86
 	github.com/hashicorp/go-uuid v0.0.0-20160329185618-73d19cdc2bf0
 	github.com/hashicorp/go-version v0.0.0-20160119211326-7e3c02b30806
@@ -72,6 +76,7 @@ require (
 	github.com/mitchellh/cli v0.0.0-20170908181043-65fcae5817c8
 	github.com/mitchellh/go-fs v0.0.0-20180402234041-7b48fa161ea7
 	github.com/mitchellh/go-homedir v0.0.0-20151025052427-d682a8f0cf13
+	github.com/mitchellh/go-testing-interface v1.0.0 // indirect
 	github.com/mitchellh/go-vnc v0.0.0-20150629162542-723ed9867aed
 	github.com/mitchellh/iochan v0.0.0-20150529224432-87b45ffd0e95
 	github.com/mitchellh/mapstructure v0.0.0-20180111000720-b4575eea38cc

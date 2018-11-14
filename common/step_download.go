@@ -2,9 +2,12 @@ package common
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"log"
 
+	"github.com/gofrs/flock"
 	"github.com/hashicorp/go-getter"
 	urlhelper "github.com/hashicorp/go-getter/helper/url"
 
@@ -50,17 +53,29 @@ func (s *StepDownload) Run(_ context.Context, state multistep.StateBag) multiste
 	ui := state.Get("ui").(packer.Ui)
 
 	ui.Say(fmt.Sprintf("Retrieving %s", s.Description))
-	targetPath := s.TargetPath
-	if targetPath != "" {
-		state.Put("error", fmt.Errorf("a target path must be set"))
-		return multistep.ActionHalt
-	}
-
-	log.Printf("Acquiring lock to: %s", targetPath)
-	panic("actually lock file !")
 
 	var errs []error
 	for _, url := range s.Url {
+		targetPath := s.TargetPath
+		if targetPath == "" {
+			shaSum := sha1.Sum([]byte(url))
+			targetPath = hex.EncodeToString(shaSum[:])
+			if s.Extension != "" {
+				targetPath += "." + s.Extension
+			}
+		}
+		targetPath, err := packer.CachePath(targetPath)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("CachePath: %s", err))
+			continue // may be another url will work
+		}
+		lockFile := targetPath + ".lock"
+
+		log.Printf("Acquiring lock for: %s (%s)", url, lockFile)
+		lock := flock.New(lockFile)
+		lock.Lock()
+		defer lock.Unlock()
+
 		ui.Say(fmt.Sprintf("Trying %s", url))
 		u, err := urlhelper.Parse(url)
 		if err != nil {
@@ -75,7 +90,7 @@ func (s *StepDownload) Run(_ context.Context, state multistep.StateBag) multiste
 			continue // may be another url will work
 		}
 
-		ui.Say(fmt.Sprintf("%s downloaded", url))
+		ui.Say(fmt.Sprintf("%s => %s", url, targetPath))
 		state.Put(s.ResultKey, targetPath)
 		return multistep.ActionContinue
 	}

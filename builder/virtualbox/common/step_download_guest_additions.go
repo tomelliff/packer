@@ -130,6 +130,7 @@ func (s *StepDownloadGuestAdditions) Run(ctx context.Context, state multistep.St
 		Description:  "Guest additions",
 		ResultKey:    "guest_additions_path",
 		Url:          []string{url},
+		Extension:    "iso",
 	}
 
 	return downStep.Run(ctx, state)

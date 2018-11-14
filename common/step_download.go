@@ -55,42 +55,48 @@ func (s *StepDownload) Run(_ context.Context, state multistep.StateBag) multiste
 	ui.Say(fmt.Sprintf("Retrieving %s", s.Description))
 
 	var errs []error
-	for _, url := range s.Url {
+	for i := range s.Url {
+		u, err := urlhelper.Parse(s.Url[i])
+		if err != nil {
+			errs = append(errs, fmt.Errorf("url parse: %s", err))
+			continue // may be another url will work
+		}
+		if s.ChecksumType != "none" {
+			// add checksum to url query params as go getter will checksum for us
+			q := u.Query()
+			q.Set("checksum", s.ChecksumType+":"+s.Checksum)
+			u.RawQuery = q.Encode()
+		}
+
 		targetPath := s.TargetPath
 		if targetPath == "" {
-			shaSum := sha1.Sum([]byte(url))
+			// generate shasum of url+checksum
+			// to download file in cache path
+			shaSum := sha1.Sum([]byte(u.String()))
 			targetPath = hex.EncodeToString(shaSum[:])
 			if s.Extension != "" {
 				targetPath += "." + s.Extension
 			}
 		}
-		targetPath, err := packer.CachePath(targetPath)
+		targetPath, err = packer.CachePath(targetPath)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("CachePath: %s", err))
 			continue // may be another url will work
 		}
 		lockFile := targetPath + ".lock"
 
-		log.Printf("Acquiring lock for: %s (%s)", url, lockFile)
+		log.Printf("Acquiring lock for: %s (%s)", u.String(), lockFile)
 		lock := flock.New(lockFile)
 		lock.Lock()
 		defer lock.Unlock()
 
-		ui.Say(fmt.Sprintf("Trying %s", url))
-		u, err := urlhelper.Parse(url)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("url parse: %s", err))
-			continue // may be another url will work
-		}
-		// add checksum to url query params as go getter will checksum for us
-		u.Query().Set("checksum", s.ChecksumType+":"+s.Checksum)
-
+		ui.Say(fmt.Sprintf("Trying %s", u.String()))
 		if err := getter.GetFile(targetPath, u.String()); err != nil {
 			errs = append(errs, err)
 			continue // may be another url will work
 		}
 
-		ui.Say(fmt.Sprintf("%s => %s", url, targetPath))
+		ui.Say(fmt.Sprintf("%s => %s", u.String(), targetPath))
 		state.Put(s.ResultKey, targetPath)
 		return multistep.ActionContinue
 	}

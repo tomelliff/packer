@@ -2,6 +2,7 @@ package packer
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -10,6 +11,7 @@ func TestCachePath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Getwd: %v", err)
 	}
+	tmp := os.TempDir()
 
 	// reset env
 	cd := os.Getenv("PACKER_CACHE_DIR")
@@ -28,9 +30,9 @@ func TestCachePath(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{"base", args{}, nil, wd + "/packer_cache", false},
-		{"base and path", args{[]string{"a", "b"}}, nil, wd + "/packer_cache/a/b", false},
-		{"env and path", args{[]string{"a", "b"}}, map[string]string{"PACKER_CACHE_DIR": "/tmp/"}, "/tmp/a/b", false},
+		{"base", args{}, nil, filepath.Join(wd, "packer_cache"), false},
+		{"base and path", args{[]string{"a", "b"}}, nil, filepath.Join(wd, "packer_cache", "a", "b"), false},
+		{"env and path", args{[]string{"a", "b"}}, map[string]string{"PACKER_CACHE_DIR": tmp}, filepath.Join(tmp, "a", "b"), false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

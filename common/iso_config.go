@@ -27,19 +27,24 @@ type ISOConfig struct {
 }
 
 func (c *ISOConfig) Prepare(ctx *interpolate.Context) (warnings []string, errs []error) {
+	if len(c.ISOUrls) != 0 && c.RawSingleISOUrl != "" {
+		errs = append(
+			errs, errors.New("Only one of iso_url or iso_urls must be specified"))
+		return
+	}
 
 	if c.RawSingleISOUrl != "" {
 		c.ISOUrls = append([]string{c.RawSingleISOUrl}, c.ISOUrls...)
 	}
 	if len(c.ISOUrls) == 0 {
 		errs = append(
-			errs, errors.New("One of iso_url or iso_urls must be specified."))
+			errs, errors.New("One of iso_url or iso_urls must be specified"))
 		return
 	}
 
 	if c.ISOChecksumType == "" {
 		errs = append(
-			errs, errors.New("The iso_checksum_type must be specified."))
+			errs, errors.New("The iso_checksum_type must be specified"))
 		return
 	}
 	c.ISOChecksumType = strings.ToLower(c.ISOChecksumType)

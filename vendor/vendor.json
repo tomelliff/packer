@@ -1028,10 +1028,10 @@
 			"revisionTime": "2018-08-30T03:37:06Z"
 		},
 		{
-			"checksumSHA1": "N/KIhNnPma0fYWlNthrL+SEF1o0=",
+			"checksumSHA1": "ZzzzYKAgOejlrREix66SJE/Ag+I=",
 			"path": "github.com/hashicorp/go-getter",
-			"revision": "48a5dcaf85410cd9383f8d97eac21bd163edfd51",
-			"revisionTime": "2018-11-14T13:24:57Z"
+			"revision": "e7b70961448d4f10cfc9e5dd815126ad0c0939ba",
+			"revisionTime": "2018-12-04T11:03:35Z"
 		},
 		{
 			"checksumSHA1": "9J+kDr29yDrwsdu2ULzewmqGjpA=",

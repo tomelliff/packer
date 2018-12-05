@@ -2,10 +2,7 @@ package getter
 
 import (
 	"bytes"
-	"crypto/md5"
-	"crypto/sha1"
-	"crypto/sha256"
-	"crypto/sha512"
+	"context"
 	"encoding/hex"
 	"fmt"
 	"hash"
@@ -26,6 +23,9 @@ import (
 // Using a client directly allows more fine-grained control over how downloading
 // is done, as well as customizing the protocols supported.
 type Client struct {
+	// ctx for cancellation
+	ctx context.Context
+
 	// Src is the source URL to get.
 	//
 	// Dst is the path to save the downloaded thing as. If Dir is set to
@@ -62,10 +62,20 @@ type Client struct {
 	//
 	// WARNING: deprecated. If Mode is set, that will take precedence.
 	Dir bool
+
+	// ProgressListener allows to track file downloads.
+	// By default a no op progress listener is used.
+	ProgressListener ProgressTracker
+
+	Options []ClientOption
 }
 
 // Get downloads the configured source to the destination.
 func (c *Client) Get() error {
+	if err := c.Configure(c.Options...); err != nil {
+		return err
+	}
+
 	// Store this locally since there are cases we swap this
 	mode := c.Mode
 	if mode == ClientModeInvalid {
@@ -76,18 +86,7 @@ func (c *Client) Get() error {
 		}
 	}
 
-	// Default decompressor value
-	decompressors := c.Decompressors
-	if decompressors == nil {
-		decompressors = Decompressors
-	}
-
-	// Detect the URL. This is safe if it is already detected.
-	detectors := c.Detectors
-	if detectors == nil {
-		detectors = Detectors
-	}
-	src, err := Detect(c.Src, c.Pwd, detectors)
+	src, err := Detect(c.Src, c.Pwd, c.Detectors)
 	if err != nil {
 		return err
 	}
@@ -119,12 +118,7 @@ func (c *Client) Get() error {
 		force = u.Scheme
 	}
 
-	getters := c.Getters
-	if getters == nil {
-		getters = Getters
-	}
-
-	g, ok := getters[force]
+	g, ok := c.Getters[force]
 	if !ok {
 		return fmt.Errorf(
 			"download not supported for scheme '%s'", force)
@@ -150,7 +144,7 @@ func (c *Client) Get() error {
 	if archiveV == "" {
 		// We don't appear to... but is it part of the filename?
 		matchingLen := 0
-		for k, _ := range decompressors {
+		for k := range c.Decompressors {
 			if strings.HasSuffix(u.Path, "."+k) && len(k) > matchingLen {
 				archiveV = k
 				matchingLen = len(k)
@@ -163,7 +157,7 @@ func (c *Client) Get() error {
 	// real path.
 	var decompressDst string
 	var decompressDir bool
-	decompressor := decompressors[archiveV]
+	decompressor := c.Decompressors[archiveV]
 	if decompressor != nil {
 		// Create a temporary directory to store our archive. We delete
 		// this at the end of everything.
@@ -182,43 +176,15 @@ func (c *Client) Get() error {
 		mode = ClientModeFile
 	}
 
-	// Determine if we have a checksum
-	var checksumHash hash.Hash
-	var checksumValue []byte
-	if v := q.Get("checksum"); v != "" {
-		// Delete the query parameter if we have it.
-		q.Del("checksum")
-		u.RawQuery = q.Encode()
-
-		// Determine the checksum hash type
-		checksumType := ""
-		idx := strings.Index(v, ":")
-		if idx > -1 {
-			checksumType = v[:idx]
-		}
-		switch checksumType {
-		case "md5":
-			checksumHash = md5.New()
-		case "sha1":
-			checksumHash = sha1.New()
-		case "sha256":
-			checksumHash = sha256.New()
-		case "sha512":
-			checksumHash = sha512.New()
-		default:
-			return fmt.Errorf(
-				"unsupported checksum type: %s", checksumType)
-		}
-
-		// Get the remainder of the value and parse it into bytes
-		b, err := hex.DecodeString(v[idx+1:])
-		if err != nil {
-			return fmt.Errorf("invalid checksum: %s", err)
-		}
-
-		// Set our value
-		checksumValue = b
+	// Determine checksum if we have one
+	checksumHash, checksumValue, err := checksumHashAndValue(c.ctx, u) // can return nil nil nil
+	if err != nil {
+		return fmt.Errorf("invalid checksum: %s", err)
 	}
+
+	// Delete the query parameter if we have it.
+	q.Del("checksum")
+	u.RawQuery = q.Encode()
 
 	if mode == ClientModeAny {
 		// Ask the getter which client mode to use
@@ -256,7 +222,7 @@ func (c *Client) Get() error {
 			}
 		}
 		if getFile {
-			err := g.GetFile(dst, u)
+			err := g.GetFile(c.ctx, dst, u)
 			if err != nil {
 				return err
 			}
@@ -307,7 +273,7 @@ func (c *Client) Get() error {
 
 		// We're downloading a directory, which might require a bit more work
 		// if we're specifying a subdir.
-		err := g.Get(dst, u)
+		err := g.Get(c.ctx, dst, u)
 		if err != nil {
 			err = fmt.Errorf("error downloading '%s': %s", src, err)
 			return err
@@ -329,7 +295,7 @@ func (c *Client) Get() error {
 			return err
 		}
 
-		return copyDir(realDst, subDir, false)
+		return copyDir(c.ctx, realDst, subDir, false)
 	}
 
 	return nil

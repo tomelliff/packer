@@ -91,7 +91,7 @@ func (s *StepDownload) Run(ctx context.Context, state multistep.StateBag) multis
 		defer lock.Unlock()
 
 		ui.Say(fmt.Sprintf("Trying %s", u.String()))
-		if err := getter.GetFile(targetPath, u.String(), getter.WithCheggaaaProgressBarV1(), getter.WithContext(ctx)); err != nil {
+		if err := getter.GetFile(targetPath, u.String(), getter.WithProgress(ui), getter.WithContext(ctx)); err != nil {
 			errs = append(errs, err)
 			continue // may be another url will work
 		}

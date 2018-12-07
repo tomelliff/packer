@@ -599,6 +599,6 @@ func (ui *Ui) Machine(t string, args ...string) {
 	<-ui.sem
 }
 
-func (ui *Ui) ProgressBar() packer.ProgressBar {
-	return new(packer.NoopProgressBar)
+func (ui *Ui) TrackProgress(src string, currentSize, totalSize int64, stream io.ReadCloser) (body io.ReadCloser) {
+	return stream
 }

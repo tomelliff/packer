@@ -82,6 +82,8 @@ builder.
 -   `iso_url` (string) - A URL to the ISO containing the installation image.
     This URL can be either an HTTP URL or a file URL (or path to a file). If
     this is an HTTP URL, Packer will download it and cache it between runs.
+    Packer uses hashicorp/go-getter inn order to perform a download.
+    See usage of [hashicorp/go-getter](https://github.com/hashicorp/go-getter).
 
 ### Optional:
 
@@ -222,6 +224,8 @@ builder.
     download or while downloading a single URL, it will move on to the next. All
     URLs must point to the same file (same checksum). By default this is empty
     and `iso_url` is used. Only one of `iso_url` or `iso_urls` can be specified.
+    Packer uses hashicorp/go-getter inn order to perform a download.
+    See usage of [hashicorp/go-getter](https://github.com/hashicorp/go-getter).
 
 -   `memory` (number) - The amount of memory to use when building the VM
     in megabytes.

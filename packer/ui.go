@@ -59,7 +59,7 @@ type ColoredUi struct {
 	Color      UiColor
 	ErrorColor UiColor
 	Ui         Ui
-	uiProgressBar
+	*uiProgressBar
 }
 
 var _ Ui = new(ColoredUi)
@@ -130,7 +130,7 @@ func (u *ColoredUi) supportsColors() bool {
 type TargetedUI struct {
 	Target string
 	Ui     Ui
-	uiProgressBar
+	*uiProgressBar
 }
 
 var _ Ui = new(TargetedUI)
@@ -181,7 +181,7 @@ type BasicUi struct {
 	l           sync.Mutex
 	interrupted bool
 	scanner     *bufio.Scanner
-	uiProgressBar
+	*uiProgressBar
 }
 
 var _ Ui = new(BasicUi)
@@ -337,7 +337,7 @@ func (u *MachineReadableUi) Machine(category string, args ...string) {
 // prefixes each message with an RFC3339 timestamp
 type TimestampedUi struct {
 	Ui Ui
-	uiProgressBar
+	*uiProgressBar
 }
 
 var _ Ui = new(TimestampedUi)

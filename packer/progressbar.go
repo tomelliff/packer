@@ -12,15 +12,23 @@ func defaultProgressbarConfigFn(bar *pb.ProgressBar) {
 	bar.SetUnits(pb.U_BYTES)
 }
 
-// uiProgressBar is a self managed progress bar.
-// decorate your struct with uiProgressBar to
+var defaultUiProgressBar = uiProgressBar{}
+
+// uiProgressBar is a self managed progress bar singleton
+// decorate your struct with a *uiProgressBar to
 // give it TrackProgress capabilities.
+// In TrackProgress if uiProgressBar is nil
+// defaultUiProgressBar will be used as
+// the progress bar.
 type uiProgressBar struct {
 	l  sync.Mutex
 	pb *getter.CheggaaaProgressBar
 }
 
 func (p *uiProgressBar) TrackProgress(src string, currentSize, totalSize int64, stream io.ReadCloser) io.ReadCloser {
+	if p == nil {
+		p = &defaultUiProgressBar
+	}
 	p.l.Lock()
 	defer p.l.Unlock()
 
